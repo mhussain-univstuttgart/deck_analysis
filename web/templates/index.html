@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pitch Deck Tracker</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        /* Custom styles */
+        .loading {
+            display: none;
+        }
+        
+        .loading.active {
+            display: block;
+        }
+        
+        /* Custom animations */
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+        
+        .animate-spin {
+            animation: spin 1s linear infinite;
+        }
+        
+        /* Custom transitions */
+        .transition {
+            transition-property: all;
+            transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+            transition-duration: 150ms;
+        }
+        
+        /* Custom hover effects */
+        .hover\:bg-gray-100:hover {
+            background-color: #f3f4f6;
+        }
+        
+        .hover\:border-gray-300:hover {
+            border-color: #d1d5db;
+        }
+        
+        .hover\:bg-blue-600:hover {
+            background-color: #2563eb;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <h1 class="text-4xl font-bold text-center mb-8 text-gray-800">Pitch Deck Tracker</h1>
+        
+        <!-- Upload Section -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+            <h2 class="text-2xl font-semibold mb-4 text-gray-700">Upload New Version</h2>
+            <form id="uploadForm" class="space-y-4">
+                <div class="flex items-center justify-center w-full">
+                    <label class="flex flex-col w-full h-32 border-4 border-dashed hover:bg-gray-100 hover:border-gray-300">
+                        <div class="flex flex-col items-center justify-center pt-7">
+                            <svg class="w-12 h-12 text-gray-400 group-hover:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                            </svg>
+                            <p class="pt-1 text-sm tracking-wider text-gray-400 group-hover:text-gray-600">
+                                Select a PDF file
+                            </p>
+                        </div>
+                        <input type="file" class="opacity-0" accept=".pdf" id="fileInput" />
+                    </label>
+                </div>
+                <button type="submit" class="w-full bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 transition duration-200">
+                    Upload
+                </button>
+            </form>
+        </div>
+
+        <!-- Loading Indicator -->
+        <div id="loading" class="loading text-center py-4">
+            <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent"></div>
+            <p class="mt-2 text-gray-600">Analyzing changes...</p>
+        </div>
+
+        <!-- Results Section -->
+        <div id="results" class="bg-white rounded-lg shadow-md p-6 hidden">
+            <h2 class="text-2xl font-semibold mb-4 text-gray-700">Analysis Results</h2>
+            
+            <div class="space-y-6">
+                <!-- Content Changes -->
+                <div class="border-b pb-4">
+                    <h3 class="text-xl font-medium text-gray-700 mb-2">Content Changes</h3>
+                    <ul id="contentChanges" class="list-disc pl-5 text-gray-600"></ul>
+                </div>
+
+                <!-- Meaning Changes -->
+                <div class="border-b pb-4">
+                    <h3 class="text-xl font-medium text-gray-700 mb-2">Meaning Changes</h3>
+                    <ul id="meaningChanges" class="list-disc pl-5 text-gray-600"></ul>
+                </div>
+
+                <!-- Additions -->
+                <div class="border-b pb-4">
+                    <h3 class="text-xl font-medium text-gray-700 mb-2">Additions</h3>
+                    <ul id="additions" class="list-disc pl-5 text-gray-600"></ul>
+                </div>
+
+                <!-- Removals -->
+                <div class="border-b pb-4">
+                    <h3 class="text-xl font-medium text-gray-700 mb-2">Removals</h3>
+                    <ul id="removals" class="list-disc pl-5 text-gray-600"></ul>
+                </div>
+
+                <!-- Tone Changes -->
+                <div>
+                    <h3 class="text-xl font-medium text-gray-700 mb-2">Tone Changes</h3>
+                    <ul id="toneChanges" class="list-disc pl-5 text-gray-600"></ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const uploadForm = document.getElementById('uploadForm');
+            const fileInput = document.getElementById('fileInput');
+            const loading = document.getElementById('loading');
+            const results = document.getElementById('results');
+
+            uploadForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                const file = fileInput.files[0];
+                
+                if (!file) {
+                    alert('Please select a file');
+                    return;
+                }
+
+                const formData = new FormData();
+                formData.append('file', file);
+
+                // Show loading indicator
+                loading.classList.add('active');
+                results.classList.add('hidden');
+
+                try {
+                    const response = await fetch('/api/upload', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok) {
+                        // Update the results section
+                        results.classList.remove('hidden');
+                        
+                        // Clear previous results
+                        ['contentChanges', 'meaningChanges', 'additions', 'removals', 'toneChanges'].forEach(id => {
+                            document.getElementById(id).innerHTML = '';
+                        });
+
+                        // Populate results
+                        Object.entries(data.differences).forEach(([key, value]) => {
+                            const elementId = key.replace(/_/g, '');
+                            const element = document.getElementById(elementId);
+                            value.forEach(item => {
+                                const li = document.createElement('li');
+                                li.textContent = item;
+                                element.appendChild(li);
+                            });
+                        });
+                    } else {
+                        alert(data.error || 'An error occurred');
+                    }
+                } catch (error) {
+                    alert('An error occurred while uploading the file');
+                } finally {
+                    // Hide loading indicator
+                    loading.classList.remove('active');
+                }
+            });
+        });
+    </script>
+</body>
+</html> 
