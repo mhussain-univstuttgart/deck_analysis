@@ -1,12 +1,17 @@
 import os
 import json
-import openai
+import logging
+import google.generativeai as genai
+import re
 
-# Set the API key directly
-openai.api_key = os.getenv("OPENAI_API_KEY")
+# Configure logging
+logger = logging.getLogger(__name__)
+
+# Configure the Gemini API
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
 def analyze_differences(old_text, new_text):
-    """Analyze differences between two versions of text using OpenAI."""
+    """Analyze differences between two versions of text using Gemini."""
     prompt = f"""Compare these two versions of a pitch deck and identify the key differences in both content and meaning:
 
 Old Version:
@@ -28,25 +33,47 @@ Format the response as a JSON with the following structure:
     "additions": ["list of new content"],
     "removals": ["list of removed content"],
     "tone_changes": ["list of changes in tone or emphasis"]
-}}"""
+}}
 
-    response = openai.ChatCompletion.create(
-        model="gpt-4",
-        messages=[
-            {"role": "system", "content": "You are a pitch deck analysis expert. Analyze the differences between two versions of a pitch deck."},
-            {"role": "user", "content": prompt}
-        ]
-    )
+IMPORTANT: Your response must be valid JSON. Do not include any text before or after the JSON object."""
+
+    # Initialize the model
+    model = genai.GenerativeModel('gemini-2.0-flash-lite')
     
-    # Parse the response content as JSON
+    # Generate the response
+    response = model.generate_content(prompt)
+    response_text = response.text
+    logger.debug(f"Raw AI response: {response_text}")
+    
+    # Try to extract JSON from the response if it's not pure JSON
     try:
-        return json.loads(response.choices[0].message.content)
+        # First attempt: try to parse the entire response as JSON
+        return json.loads(response_text)
     except json.JSONDecodeError:
-        # Fallback if the response is not valid JSON
-        return {
-            "content_changes": ["Error parsing AI response"],
-            "meaning_changes": [],
-            "additions": [],
-            "removals": [],
-            "tone_changes": []
-        } 
+        logger.warning("Failed to parse response as JSON, attempting to extract JSON")
+        try:
+            # Second attempt: try to extract JSON using regex
+            json_match = re.search(r'(\{[\s\S]*\})', response_text)
+            if json_match:
+                json_str = json_match.group(1)
+                return json.loads(json_str)
+            else:
+                logger.error("Could not extract JSON from response")
+                # Fallback if the response is not valid JSON
+                return {
+                    "content_changes": ["Error parsing AI response"],
+                    "meaning_changes": [],
+                    "additions": [],
+                    "removals": [],
+                    "tone_changes": []
+                }
+        except Exception as e:
+            logger.error(f"Error processing AI response: {str(e)}")
+            # Fallback if the response is not valid JSON
+            return {
+                "content_changes": ["Error parsing AI response"],
+                "meaning_changes": [],
+                "additions": [],
+                "removals": [],
+                "tone_changes": []
+            } 

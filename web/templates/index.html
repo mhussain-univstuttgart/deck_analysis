@@ -143,12 +143,15 @@
                 results.classList.add('hidden');
 
                 try {
+                    console.log('Sending file to server...');
                     const response = await fetch('/api/upload', {
                         method: 'POST',
                         body: formData
                     });
 
+                    console.log('Response status:', response.status);
                     const data = await response.json();
+                    console.log('Response data:', data);
 
                     if (response.ok) {
                         // Update the results section
@@ -159,21 +162,30 @@
                             document.getElementById(id).innerHTML = '';
                         });
 
+                        // Log the exact structure of the response
+                        console.log('Differences keys:', Object.keys(data.differences));
+                        
                         // Populate results
                         Object.entries(data.differences).forEach(([key, value]) => {
                             const elementId = key.replace(/_/g, '');
                             const element = document.getElementById(elementId);
-                            value.forEach(item => {
-                                const li = document.createElement('li');
-                                li.textContent = item;
-                                element.appendChild(li);
-                            });
+                            if (element) {
+                                value.forEach(item => {
+                                    const li = document.createElement('li');
+                                    li.textContent = item;
+                                    element.appendChild(li);
+                                });
+                            } else {
+                                console.warn(`Element with ID '${elementId}' not found in the DOM`);
+                            }
                         });
                     } else {
+                        console.error('Server error:', data.error);
                         alert(data.error || 'An error occurred');
                     }
                 } catch (error) {
-                    alert('An error occurred while uploading the file');
+                    console.error('Upload error:', error);
+                    alert('An error occurred while uploading the file: ' + error.message);
                 } finally {
                     // Hide loading indicator
                     loading.classList.remove('active');
